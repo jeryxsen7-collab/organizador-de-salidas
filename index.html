@@ -440,23 +440,34 @@
       }
     });
 
-    db.ref('/outings').on('value', (snap) => {
-      if (snap.exists()) {
-        state.outings = snap.val();
-        renderSchedule();
-        renderResponseSelect();
+    // Inicializar datos si están vacíos
+    db.ref('/').once('value', async (snap) => {
+      if (!snap.val() || (!snap.val().outings || snap.val().outings.length === 0)) {
+        console.log('Inicializando datos...');
+        await db.ref('/').set({ outings: defaultOutings, responses: [] });
+        state = { outings: defaultOutings, responses: [] };
+      }
+
+      // Escuchar cambios en las salidas
+      db.ref('/outings').on('value', (snap) => {
+        if (snap.exists()) {
+          state.outings = snap.val();
+          renderSchedule();
+          renderResponseSelect();
+          renderResponses();
+          updateStats();
+        }
+      });
+
+      // Escuchar cambios en las respuestas
+      db.ref('/responses').on('value', (snap) => {
+        state.responses = snap.val() || [];
         renderResponses();
         updateStats();
-      }
-    });
+      });
 
-    db.ref('/responses').on('value', (snap) => {
-      state.responses = snap.val() || [];
-      renderResponses();
-      updateStats();
+      renderAll();
     });
-
-    renderAll();
   </script>
 </body>
 </html>
