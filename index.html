@@ -198,8 +198,9 @@
     <div id="notice" class="notice" aria-live="polite"></div>
   </main>
 
-  <script src="https://cdn.jsdelivr.net/npm/firebase@10.5.0/firebase-app.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/firebase@10.5.0/firebase-database.js"></script>
+  <!-- Cargar Firebase desde CDN (versión global) -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
   <script>
     const firebaseConfig = {
       apiKey: "AIzaSyD87uxF92OP8EbQjV5DAee0EFd4CooeeUM",
@@ -443,7 +444,7 @@
     // Inicializar datos si están vacíos
     db.ref('/').once('value', async (snap) => {
       if (!snap.val() || (!snap.val().outings || snap.val().outings.length === 0)) {
-        console.log('Inicializando datos...');
+        console.log('Inicializando datos por primera vez...');
         await db.ref('/').set({ outings: defaultOutings, responses: [] });
         state = { outings: defaultOutings, responses: [] };
       }
