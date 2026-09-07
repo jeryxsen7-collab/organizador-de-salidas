@@ -161,7 +161,7 @@
       <div class="section-heading">
         <div>
           <h2>Respuestas del grupo</h2>
-          <p class="helper">Anota el nombre de cada persona que ya respondió para una salida. El día y la hora se definen directamente en esa salida.</p>
+          <p class="helper">Anota el nombre de cada persona que ya respondió para una salida. Cada persona puede tener su propia hora preferida.</p>
         </div>
       </div>
       <div class="availability-layout">
@@ -176,9 +176,13 @@
               <label for="person-name">Nombre</label>
               <input id="person-name" name="name" required maxlength="40" placeholder="Ej. Ana">
             </div>
+            <div class="form-field full">
+              <label for="person-time">Hora preferida</label>
+              <input id="person-time" name="time" type="time" required value="18:00">
+            </div>
           </div>
           <div class="form-actions">
-            <span class="hint">Una persona puede responder en más de una salida.</span>
+            <span class="hint">Cada persona puede responder en más de una salida.</span>
             <button class="button primary" type="submit">Guardar respuesta</button>
           </div>
         </form>
@@ -324,7 +328,7 @@
         <article class="card response-card">
           <div>
             <div class="person-name">${esc(r.name)}</div>
-            <div class="response-detail"><b>${esc(getOuting(r.outingId)?.name || 'Salida eliminada')}</b><br>${fmtDate(getOuting(r.outingId)?.date)} · ${dayName(getOuting(r.outingId)?.preferredDay)} · ${fmtTime(getOuting(r.outingId)?.time || '18:00')}</div>
+            <div class="response-detail"><b>${esc(getOuting(r.outingId)?.name || 'Salida eliminada')}</b><br>${fmtDate(getOuting(r.outingId)?.date)} · ${dayName(getOuting(r.outingId)?.preferredDay)} · ${fmtTime(r.time || '18:00')}</div>
           </div>
           <div class="response-actions">
             <button class="icon-button" type="button" data-delete="${r.id}">×</button>
@@ -342,11 +346,11 @@
     function exportCsv() {
       const resp = Array.isArray(state.responses) ? state.responses : [];
       const rows = [
-        ['Orden', 'Salida', 'Fecha', 'Día', 'Hora', 'Estado'],
+        ['Orden', 'Salida', 'Fecha', 'Día', 'Hora de evento', 'Estado'],
         ...state.outings.map((o, i) => [i + 1, o.name, o.date, dayName(o.preferredDay), o.time, o.status]),
         [],
-        ['Salida', 'Persona'],
-        ...resp.map(r => [getOuting(r.outingId)?.name || 'Eliminada', r.name])
+        ['Salida', 'Persona', 'Hora preferida de esa persona'],
+        ...resp.map(r => [getOuting(r.outingId)?.name || 'Eliminada', r.name, r.time || '18:00'])
       ];
       const csv = '\ufeff' + rows.map(r => r.map(v => `"${String(v || '').replaceAll('"', '""')}"`).join(',')).join('\r\n');
       const a = document.createElement('a');
@@ -396,12 +400,14 @@
       const f = new FormData(e.target);
       const name = f.get('name').trim();
       const oid = f.get('outingId');
+      const time = f.get('time');
       if (!oid) return setNotice('Elige la salida');
       try {
         const resp = Array.isArray(state.responses) ? state.responses : [];
-        resp.push({ id: `${Date.now()}-${Math.random().toString(16).slice(2)}`, name, outingId: oid });
+        resp.push({ id: `${Date.now()}-${Math.random().toString(16).slice(2)}`, name, outingId: oid, time: time || '18:00' });
         await db.ref('/responses').set(resp);
         e.target.reset();
+        $('#person-time').value = '18:00';
         renderResponseSelect();
         setNotice('Respuesta guardada');
       } catch (err) {
