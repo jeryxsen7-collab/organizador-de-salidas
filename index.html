@@ -1,0 +1,459 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Organizador de siete salidas con disponibilidad y orden.">
+  <title>Pilosalidas</title>
+  <style>
+    :root {
+      --ink: #18232d;
+      --muted: #64727e;
+      --paper: #fbfaf7;
+      --cream: #f3efe6;
+      --line: #d9d6ce;
+      --coral: #e06552;
+      --coral-dark: #b84839;
+      --teal: #176c6b;
+      --teal-soft: #d8eeeb;
+      --sun: #f2c76c;
+      --white: #fffefa;
+      --danger: #b43d36;
+      --shadow: 0 16px 36px rgba(24, 35, 45, .09);
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-width: 320px;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 0 0, rgba(242, 199, 108, .30), transparent 29rem),
+        radial-gradient(circle at 100% 20%, rgba(216, 238, 235, .78), transparent 25rem),
+        var(--paper);
+      font-family: ui-rounded, "Avenir Next", "Segoe UI", sans-serif;
+    }
+    button, input, select { font: inherit; }
+    button { cursor: pointer; }
+    button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid rgba(23, 108, 107, .35); outline-offset: 2px; }
+
+    .app { max-width: 1180px; margin: 0 auto; padding: 38px 24px 56px; }
+    .hero { display: flex; align-items: end; justify-content: space-between; gap: 28px; margin-bottom: 28px; }
+    .eyebrow { margin: 0 0 8px; color: var(--teal); font-size: .78rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+    h1 { margin: 0; max-width: 660px; font-family: Georgia, "Times New Roman", serif; font-size: clamp(2.25rem, 5vw, 4.3rem); font-weight: 500; letter-spacing: -.055em; line-height: .98; }
+    .subtitle { max-width: 390px; margin: 0 0 4px; color: var(--muted); font-size: 1rem; line-height: 1.5; }
+
+    .topline { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 24px; }
+    .stat { padding: 18px 20px; background: rgba(255, 254, 250, .8); border: 1px solid rgba(217, 214, 206, .9); border-radius: 18px; box-shadow: 0 6px 16px rgba(24,35,45,.035); }
+    .stat strong { display: block; margin-bottom: 5px; font-size: 1.55rem; line-height: 1; }
+    .stat span { color: var(--muted); font-size: .88rem; }
+
+    .tabs { display: flex; gap: 8px; overflow-x: auto; margin-bottom: 22px; padding-bottom: 3px; }
+    .tab { flex: 0 0 auto; border: 1px solid transparent; border-radius: 999px; padding: 10px 16px; color: var(--muted); background: transparent; font-weight: 750; }
+    .tab[aria-selected="true"] { color: var(--white); background: var(--ink); box-shadow: 0 6px 12px rgba(24,35,45,.16); }
+    [role="tabpanel"] { display: none; }
+    [role="tabpanel"].active { display: block; }
+
+    .section-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 18px; margin: 0 0 15px; }
+    h2 { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: 1.65rem; font-weight: 500; letter-spacing: -.035em; }
+    .helper { margin: 3px 0 0; color: var(--muted); font-size: .92rem; line-height: 1.4; }
+    .card { border: 1px solid var(--line); border-radius: 20px; background: var(--white); box-shadow: var(--shadow); }
+    .empty { padding: 30px; color: var(--muted); text-align: center; }
+
+    .schedule-list { display: grid; gap: 10px; }
+    .outing { display: grid; grid-template-columns: 54px minmax(140px, 1.35fr) 126px 105px 94px minmax(120px, .9fr) 82px; align-items: center; gap: 12px; padding: 16px; background: var(--white); border: 1px solid var(--line); border-radius: 18px; box-shadow: 0 7px 15px rgba(24,35,45,.035); }
+    .number { display: grid; place-items: center; width: 39px; height: 39px; border-radius: 50%; color: var(--white); background: var(--coral); font-weight: 850; }
+    .outing-name { border: 0; border-bottom: 1px solid transparent; width: 100%; padding: 6px 2px; color: var(--ink); background: transparent; font-size: 1.05rem; font-weight: 800; }
+    .outing-name:hover, .outing-name:focus { border-bottom-color: var(--teal); }
+    .outing label { display: block; color: var(--muted); font-size: .72rem; font-weight: 750; letter-spacing: .04em; text-transform: uppercase; }
+    .outing input, .outing select, .form-field input, .form-field select { width: 100%; margin-top: 4px; border: 1px solid var(--line); border-radius: 9px; padding: 8px 9px; color: var(--ink); background: var(--paper); }
+    .status { display: inline-flex; align-items: center; min-height: 31px; border-radius: 999px; padding: 6px 10px; color: var(--teal); background: var(--teal-soft); font-size: .82rem; font-weight: 800; }
+    .status.pending { color: #916613; background: #fbebc6; }
+    .status.done { color: #4f6d28; background: #e3efcf; }
+    .move-actions { display: flex; justify-content: flex-end; gap: 5px; }
+    .icon-button { width: 34px; height: 34px; border: 1px solid var(--line); border-radius: 9px; color: var(--ink); background: var(--white); font-weight: 900; }
+    .icon-button:hover { border-color: var(--teal); color: var(--teal); }
+    .icon-button:disabled { opacity: .35; cursor: not-allowed; }
+
+    .availability-layout { display: grid; grid-template-columns: minmax(310px, .85fr) minmax(0, 1.5fr); gap: 18px; align-items: start; }
+    .form-card { padding: 22px; }
+    .form-card h3, .response-card h3 { margin: 0 0 15px; font-size: 1.05rem; }
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .form-field.full { grid-column: 1 / -1; }
+    .form-field label { color: var(--muted); font-size: .82rem; font-weight: 750; }
+    .day-picks { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 7px; }
+    .day-picks input { position: absolute; opacity: 0; pointer-events: none; }
+    .day-picks label { min-width: 38px; border: 1px solid var(--line); border-radius: 9px; padding: 8px 7px; color: var(--muted); background: var(--white); text-align: center; font-size: .82rem; font-weight: 800; cursor: pointer; }
+    .day-picks input:checked + label { border-color: var(--teal); color: var(--white); background: var(--teal); }
+    .form-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 20px; }
+    .button { border: 0; border-radius: 10px; padding: 10px 14px; font-weight: 800; }
+    .button.primary { color: var(--white); background: var(--coral); }
+    .button.primary:hover { background: var(--coral-dark); }
+    .button.secondary { color: var(--teal); background: var(--teal-soft); }
+    .hint { color: var(--muted); font-size: .8rem; }
+    .response-list { display: grid; gap: 10px; }
+    .response-card { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: start; padding: 16px; }
+    .person-name { font-weight: 850; }
+    .response-detail { margin-top: 5px; color: var(--muted); font-size: .88rem; line-height: 1.45; }
+    .response-detail b { color: var(--ink); }
+    .response-actions { display: flex; gap: 6px; }
+
+    .finder-layout { display: grid; grid-template-columns: minmax(260px, .78fr) minmax(0, 1.65fr); gap: 18px; align-items: start; }
+    .finder-controls { padding: 22px; }
+    .finder-controls label { display: block; color: var(--muted); font-size: .82rem; font-weight: 750; }
+    .finder-controls select { width: 100%; margin: 5px 0 16px; border: 1px solid var(--line); border-radius: 9px; padding: 10px; background: var(--paper); }
+    .recommendation { padding: 24px; }
+    .recommendation-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+    .recommendation h3 { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: 1.8rem; font-weight: 500; }
+    .big-time { color: var(--coral); font-size: 1.5rem; font-weight: 850; white-space: nowrap; }
+    .recommendation p { max-width: 550px; margin: 10px 0 20px; color: var(--muted); line-height: 1.5; }
+    .day-results { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; }
+    .day-result { min-height: 94px; padding: 11px 8px; border: 1px solid var(--line); border-radius: 12px; background: var(--paper); text-align: center; }
+    .day-result.best { border-color: var(--teal); background: var(--teal-soft); }
+    .day-result strong { display: block; font-size: .9rem; }
+    .day-result span { display: block; margin-top: 8px; color: var(--muted); font-size: .78rem; line-height: 1.25; }
+    .day-result.best span { color: var(--teal); font-weight: 800; }
+    .note { margin-top: 16px; padding-top: 15px; border-top: 1px solid var(--line); color: var(--muted); font-size: .84rem; line-height: 1.45; }
+
+    .footer-actions { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; margin-top: 22px; }
+    .footer-actions .right { display: flex; flex-wrap: wrap; gap: 9px; }
+    .notice { min-height: 21px; margin: 12px 1px 0; color: var(--teal); font-size: .86rem; font-weight: 750; }
+
+    @media (max-width: 850px) {
+      .hero { display: block; }
+      .subtitle { margin-top: 15px; }
+      .outing { grid-template-columns: 45px 1fr 115px 110px; }
+      .outing .date-field { grid-column: 2 / 3; }
+      .outing .status-field { grid-column: 3 / 4; }
+      .outing .day-field { grid-column: 4 / 5; }
+      .outing .time-field { grid-column: 2 / 3; }
+      .move-actions { grid-column: 4 / 5; grid-row: 1; }
+      .availability-layout, .finder-layout { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 600px) {
+      .app { padding: 27px 15px 42px; }
+      .topline { grid-template-columns: 1fr; gap: 9px; }
+      .stat { padding: 14px 16px; }
+      .outing { grid-template-columns: 42px 1fr 1fr; gap: 9px; padding: 13px; }
+      .outing .date-field { grid-column: 2 / 3; }
+      .outing .day-field { grid-column: 3 / 4; }
+      .outing .time-field { grid-column: 2 / 3; }
+      .outing .status-field { grid-column: 3 / 4; }
+      .move-actions { grid-column: 3 / 4; grid-row: 1; }
+      .form-grid { grid-template-columns: 1fr; }
+      .form-field.full { grid-column: auto; }
+      .day-results { grid-template-columns: repeat(4, 1fr); }
+      .recommendation-top { display: block; }
+      .big-time { margin-top: 8px; }
+      .footer-actions { display: block; }
+      .footer-actions .right { margin-top: 12px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header class="hero">
+      <div>
+        <p class="eyebrow">De septiembre a diciembre</p>
+        <h1>Pilosalidas</h1>
+      </div>
+        <p class="subtitle">Ordena tus planes, define el día y la hora de cada uno, y lleva un registro de las personas que ya respondieron.</p>
+    </header>
+
+    <section class="topline" aria-label="Resumen">
+      <div class="stat"><strong id="stat-outings">7</strong><span>salidas por organizar</span></div>
+      <div class="stat"><strong id="stat-people">0</strong><span>respuestas registradas</span></div>
+      <div class="stat"><strong id="stat-window">Sep — Dic</strong><span>periodo de planificación</span></div>
+    </section>
+
+    <nav class="tabs" role="tablist" aria-label="Secciones del organizador">
+      <button class="tab" id="tab-order" type="button" role="tab" aria-selected="true" aria-controls="panel-order">1. Orden de salidas</button>
+      <button class="tab" id="tab-responses" type="button" role="tab" aria-selected="false" aria-controls="panel-responses">2. Respuestas</button>
+    </nav>
+
+    <section id="panel-order" class="active" role="tabpanel" aria-labelledby="tab-order">
+      <div class="section-heading">
+        <div>
+          <h2>Orden de las salidas</h2>
+          <p class="helper">Escribe cada plan, añade una fecha tentativa, el día y la hora que prefieres, y usa las flechas para decidir el orden.</p>
+        </div>
+      </div>
+      <div id="schedule-list" class="schedule-list" aria-live="polite"></div>
+    </section>
+
+    <section id="panel-responses" role="tabpanel" aria-labelledby="tab-responses">
+      <div class="section-heading">
+        <div>
+          <h2>Respuestas del grupo</h2>
+          <p class="helper">Anota el nombre de cada persona que ya respondió para una salida. El día y la hora se definen directamente en esa salida.</p>
+        </div>
+      </div>
+      <div class="availability-layout">
+        <form id="response-form" class="card form-card">
+          <h3>Registrar una respuesta</h3>
+          <div class="form-grid">
+            <div class="form-field full">
+              <label for="response-outing">Salida</label>
+              <select id="response-outing" name="outingId" required></select>
+            </div>
+            <div class="form-field full">
+              <label for="person-name">Nombre</label>
+              <input id="person-name" name="name" required maxlength="40" placeholder="Ej. Ana">
+            </div>
+          </div>
+          <div class="form-actions">
+            <span class="hint">Una persona puede responder en más de una salida.</span>
+            <button class="button primary" type="submit">Guardar respuesta</button>
+          </div>
+        </form>
+        <div id="response-list" class="response-list" aria-live="polite"></div>
+      </div>
+    </section>
+
+    <div class="footer-actions">
+      <span class="hint">Se guarda automáticamente en este dispositivo.</span>
+      <div class="right">
+        <button id="export-csv" class="button secondary" type="button">Exportar resumen</button>
+        <button id="reset-data" class="button" type="button">Restablecer ejemplo</button>
+      </div>
+    </div>
+    <div id="notice" class="notice" aria-live="polite"></div>
+  </main>
+
+  <script>
+    (() => {
+      const KEY = 'mis-7-salidas-v1';
+      const days = [
+        { id: 'mon', label: 'Lun', long: 'Lunes', js: 1 },
+        { id: 'tue', label: 'Mar', long: 'Martes', js: 2 },
+        { id: 'wed', label: 'Mié', long: 'Miércoles', js: 3 },
+        { id: 'thu', label: 'Jue', long: 'Jueves', js: 4 },
+        { id: 'fri', label: 'Vie', long: 'Viernes', js: 5 },
+        { id: 'sat', label: 'Sáb', long: 'Sábado', js: 6 },
+        { id: 'sun', label: 'Dom', long: 'Domingo', js: 0 }
+      ];
+      const defaultOutings = [
+        { id: 'outing-1', name: 'Salida 1', date: '2026-09-12', preferredDay: '', time: '18:00', status: 'Por decidir' },
+        { id: 'outing-2', name: 'Salida 2', date: '2026-09-26', preferredDay: '', time: '18:00', status: 'Por decidir' },
+        { id: 'outing-3', name: 'Salida 3', date: '2026-10-10', preferredDay: '', time: '18:00', status: 'Por decidir' },
+        { id: 'outing-4', name: 'Salida 4', date: '2026-10-24', preferredDay: '', time: '18:00', status: 'Por decidir' },
+        { id: 'outing-5', name: 'Salida 5', date: '2026-11-07', preferredDay: '', time: '18:00', status: 'Por decidir' },
+        { id: 'outing-6', name: 'Salida 6', date: '2026-11-21', preferredDay: '', time: '18:00', status: 'Por decidir' },
+        { id: 'outing-7', name: 'Salida 7', date: '2026-12-05', preferredDay: '', time: '18:00', status: 'Por decidir' }
+      ];
+      const statuses = ['Por decidir', 'Propuesta enviada', 'Confirmada'];
+      let state = load();
+      let editId = null;
+
+      const $ = (selector) => document.querySelector(selector);
+      const escapeHtml = (value) => String(value).replace(/[&<>'"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' })[c]);
+      function cloneDefaults() { return JSON.parse(JSON.stringify(defaultOutings)); }
+      function load() {
+        try {
+          const parsed = JSON.parse(localStorage.getItem(KEY));
+          if (parsed && Array.isArray(parsed.outings) && Array.isArray(parsed.responses)) {
+            const defaults = cloneDefaults();
+            const outings = parsed.outings.map((outing, index) => ({ ...defaults[index], ...outing, id: outing.id || `outing-${index + 1}` }));
+            const validOutingIds = new Set(outings.map(outing => outing.id));
+            return {
+              outings,
+              responses: parsed.responses
+                .filter(response => response && response.name)
+                .map((response, index) => ({
+                  id: response.id || `legacy-${index}`,
+                  name: response.name,
+                  outingId: validOutingIds.has(response.outingId) ? response.outingId : outings[0]?.id
+                }))
+            };
+          }
+        } catch (_) { /* Start fresh if stored data is corrupt. */ }
+        return { outings: cloneDefaults(), responses: [] };
+      }
+      function save() { localStorage.setItem(KEY, JSON.stringify(state)); updateStats(); }
+      function setNotice(message) {
+        $('#notice').textContent = message;
+        window.clearTimeout(setNotice.timer);
+        setNotice.timer = window.setTimeout(() => { $('#notice').textContent = ''; }, 3600);
+      }
+      function formatDate(value) {
+        if (!value) return 'sin fecha';
+        const [year, month, day] = value.split('-').map(Number);
+        return new Intl.DateTimeFormat('es', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(year, month - 1, day));
+      }
+      function displayTime(time) {
+        const [h, m] = time.split(':').map(Number);
+        const suffix = h >= 12 ? 'p. m.' : 'a. m.';
+        const hour = h % 12 || 12;
+        return `${hour}:${String(m).padStart(2, '0')} ${suffix}`;
+      }
+      function updateStats() {
+        $('#stat-outings').textContent = state.outings.length;
+        $('#stat-people').textContent = state.responses.length;
+      }
+      function statusClass(status) {
+        return status === 'Confirmada' ? 'done' : status === 'Propuesta enviada' ? '' : 'pending';
+      }
+      function renderSchedule() {
+        const list = $('#schedule-list');
+        list.innerHTML = state.outings.map((outing, index) => `
+          <article class="outing" data-index="${index}">
+            <span class="number" aria-label="Salida número ${index + 1}">${index + 1}</span>
+            <input class="outing-name" aria-label="Nombre de salida ${index + 1}" data-field="name" value="${escapeHtml(outing.name)}">
+            <div class="date-field">
+              <label>Fecha tentativa<input type="date" data-field="date" value="${outing.date || ''}"></label>
+            </div>
+            <div class="day-field">
+              <label>Día preferido<select data-field="preferredDay">
+                <option value="">A elegir</option>
+                ${days.map(day => `<option value="${day.id}" ${outing.preferredDay === day.id ? 'selected' : ''}>${day.long}</option>`).join('')}
+              </select></label>
+            </div>
+            <div class="time-field">
+              <label>Hora preferida<input type="time" data-field="time" value="${outing.time || '18:00'}"></label>
+            </div>
+            <div class="status-field">
+              <label>Estado<select data-field="status">${statuses.map(status => `<option ${outing.status === status ? 'selected' : ''}>${status}</option>`).join('')}</select></label>
+            </div>
+            <div class="move-actions" aria-label="Mover salida ${index + 1}">
+              <button class="icon-button" type="button" data-move="up" ${index === 0 ? 'disabled' : ''} aria-label="Subir ${escapeHtml(outing.name)}">↑</button>
+              <button class="icon-button" type="button" data-move="down" ${index === state.outings.length - 1 ? 'disabled' : ''} aria-label="Bajar ${escapeHtml(outing.name)}">↓</button>
+            </div>
+          </article>`).join('');
+      }
+      function preferredDayName(id) {
+        return days.find(day => day.id === id)?.long || 'Día a elegir';
+      }
+      function getOuting(id) {
+        return state.outings.find(outing => outing.id === id);
+      }
+      function renderResponseOutingSelect() {
+        const select = $('#response-outing');
+        const current = select.value;
+        select.innerHTML = state.outings.map((outing, index) => `<option value="${outing.id}">${index + 1}. ${escapeHtml(outing.name)}</option>`).join('');
+        select.value = state.outings.some(outing => outing.id === current) ? current : state.outings[0]?.id || '';
+      }
+      function renderResponses() {
+        const list = $('#response-list');
+        if (!state.responses.length) {
+          list.innerHTML = '<div class="card empty">Aún no hay respuestas registradas. Anota el primer nombre aquí.</div>';
+          return;
+        }
+        list.innerHTML = state.responses.map(response => `
+          <article class="card response-card">
+            <div>
+              <div class="person-name">${escapeHtml(response.name)}</div>
+              <div class="response-detail"><b>${escapeHtml(getOuting(response.outingId)?.name || 'Salida eliminada')}</b><br>${formatDate(getOuting(response.outingId)?.date)} · ${preferredDayName(getOuting(response.outingId)?.preferredDay)} · ${displayTime(getOuting(response.outingId)?.time || '18:00')}</div>
+            </div>
+            <div class="response-actions">
+              <button class="icon-button" type="button" data-edit="${response.id}" aria-label="Editar respuesta de ${escapeHtml(response.name)}">✎</button>
+              <button class="icon-button" type="button" data-delete="${response.id}" aria-label="Eliminar respuesta de ${escapeHtml(response.name)}">×</button>
+            </div>
+          </article>`).join('');
+      }
+      function renderAll() { updateStats(); renderSchedule(); renderResponseOutingSelect(); renderResponses(); }
+      function openEdit(id) {
+        const response = state.responses.find(item => item.id === id);
+        if (!response) return;
+        editId = id;
+        $('#person-name').value = response.name;
+        $('#response-outing').value = response.outingId;
+        $('#response-form button[type="submit"]').textContent = 'Actualizar respuesta';
+        $('#person-name').focus();
+      }
+      function resetForm() {
+        editId = null;
+        $('#response-form').reset();
+        renderResponseOutingSelect();
+        $('#response-form button[type="submit"]').textContent = 'Guardar respuesta';
+      }
+      function exportCsv() {
+        const rows = [
+          ['Orden', 'Salida', 'Fecha tentativa', 'Día preferido', 'Hora preferida', 'Estado'],
+          ...state.outings.map((outing, index) => [index + 1, outing.name, outing.date, preferredDayName(outing.preferredDay), outing.time || '', outing.status]),
+          [],
+          ['Salida', 'Persona que respondió'],
+          ...state.responses.map(response => [getOuting(response.outingId)?.name || 'Salida eliminada', response.name])
+        ];
+        const csv = '\ufeff' + rows.map(row => row.map(value => `"${String(value ?? '').replaceAll('"', '""')}"`).join(',')).join('\r\n');
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
+        link.download = 'pilosalidas.csv';
+        link.click();
+        URL.revokeObjectURL(link.href);
+        setNotice('Se descargó el resumen en formato CSV.');
+      }
+
+      $('.tabs').addEventListener('click', (event) => {
+        const tab = event.target.closest('[role="tab"]');
+        if (!tab) return;
+        document.querySelectorAll('[role="tab"]').forEach(item => item.setAttribute('aria-selected', item === tab ? 'true' : 'false'));
+        document.querySelectorAll('[role="tabpanel"]').forEach(panel => panel.classList.toggle('active', panel.id === tab.getAttribute('aria-controls')));
+      });
+      $('#schedule-list').addEventListener('change', (event) => {
+        const field = event.target.dataset.field;
+        if (!field) return;
+        const index = Number(event.target.closest('.outing').dataset.index);
+        state.outings[index][field] = event.target.value;
+        save();
+        // A date input can emit its change event while the user is still
+        // choosing parts of the date. Do not replace it at that moment.
+        if (field === 'status') renderSchedule();
+        renderResponseOutingSelect();
+        renderResponses();
+      });
+      $('#schedule-list').addEventListener('click', (event) => {
+        const button = event.target.closest('[data-move]');
+        if (!button) return;
+        const index = Number(button.closest('.outing').dataset.index);
+        const target = button.dataset.move === 'up' ? index - 1 : index + 1;
+        if (target < 0 || target >= state.outings.length) return;
+        [state.outings[index], state.outings[target]] = [state.outings[target], state.outings[index]];
+        save();
+        renderSchedule();
+        renderResponseOutingSelect();
+        setNotice('Se actualizó el orden de las salidas.');
+      });
+      $('#response-form').addEventListener('submit', (event) => {
+        event.preventDefault();
+        const form = new FormData(event.currentTarget);
+        const name = form.get('name').trim();
+        const outingId = form.get('outingId');
+        if (!outingId) { setNotice('Elige la salida que ya respondió la persona.'); return; }
+        const response = { id: editId || `${Date.now()}-${Math.random().toString(16).slice(2)}`, name, outingId };
+        const wasEditing = Boolean(editId);
+        if (wasEditing) state.responses = state.responses.map(item => item.id === editId ? response : item);
+        else state.responses.push(response);
+        save();
+        resetForm();
+        renderResponses();
+        setNotice(wasEditing ? 'La respuesta fue actualizada.' : 'La respuesta fue guardada.');
+      });
+      $('#response-list').addEventListener('click', (event) => {
+        const edit = event.target.closest('[data-edit]');
+        const remove = event.target.closest('[data-delete]');
+        if (edit) openEdit(edit.dataset.edit);
+        if (remove) {
+          const response = state.responses.find(item => item.id === remove.dataset.delete);
+          if (!response || !window.confirm(`¿Eliminar la respuesta de ${response.name}?`)) return;
+          state.responses = state.responses.filter(item => item.id !== remove.dataset.delete);
+          save();
+          if (editId === remove.dataset.delete) resetForm();
+          renderResponses();
+          setNotice('Se eliminó la respuesta.');
+        }
+      });
+      $('#export-csv').addEventListener('click', exportCsv);
+      $('#reset-data').addEventListener('click', () => {
+        if (!window.confirm('¿Restablecer las 7 salidas de ejemplo y borrar todas las respuestas?')) return;
+        state = { outings: cloneDefaults(), responses: [] };
+        save();
+        resetForm();
+        renderAll();
+        setNotice('Se restableció el organizador.');
+      });
+
+      renderAll();
+    })();
+  </script>
+</body>
+</html>
