@@ -225,10 +225,11 @@
     <div id="notice" class="notice" aria-live="polite"></div>
   </main>
 
-  <script src="https://www.gstatic.com/firebasejs/10.5.0/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.5.0/firebase-database.js"></script>
-  <script>
-    // Configuración de Firebase con credenciales reales
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.5.0/firebase-app.js';
+    import { getDatabase, ref, onValue, set } from 'https://www.gstatic.com/firebasejs/10.5.0/firebase-database.js';
+
+    // Configuración de Firebase
     const firebaseConfig = {
       apiKey: "AIzaSyD87uxF92OP8EbQjV5DAee0EFd4CooeeUM",
       authDomain: "pilosalidas.firebaseapp.com",
@@ -241,291 +242,269 @@
     };
 
     // Inicializar Firebase
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.database();
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
 
-    (() => {
-      const days = [
-        { id: 'mon', label: 'Lun', long: 'Lunes', js: 1 },
-        { id: 'tue', label: 'Mar', long: 'Martes', js: 2 },
-        { id: 'wed', label: 'Mié', long: 'Miércoles', js: 3 },
-        { id: 'thu', label: 'Jue', long: 'Jueves', js: 4 },
-        { id: 'fri', label: 'Vie', long: 'Viernes', js: 5 },
-        { id: 'sat', label: 'Sáb', long: 'Sábado', js: 6 },
-        { id: 'sun', label: 'Dom', long: 'Domingo', js: 0 }
+    const days = [
+      { id: 'mon', label: 'Lun', long: 'Lunes', js: 1 },
+      { id: 'tue', label: 'Mar', long: 'Martes', js: 2 },
+      { id: 'wed', label: 'Mié', long: 'Miércoles', js: 3 },
+      { id: 'thu', label: 'Jue', long: 'Jueves', js: 4 },
+      { id: 'fri', label: 'Vie', long: 'Viernes', js: 5 },
+      { id: 'sat', label: 'Sáb', long: 'Sábado', js: 6 },
+      { id: 'sun', label: 'Dom', long: 'Domingo', js: 0 }
+    ];
+    const defaultOutings = [
+      { id: 'outing-1', name: 'Salida 1', date: '2026-09-12', preferredDay: '', time: '18:00', status: 'Por decidir' },
+      { id: 'outing-2', name: 'Salida 2', date: '2026-09-26', preferredDay: '', time: '18:00', status: 'Por decidir' },
+      { id: 'outing-3', name: 'Salida 3', date: '2026-10-10', preferredDay: '', time: '18:00', status: 'Por decidir' },
+      { id: 'outing-4', name: 'Salida 4', date: '2026-10-24', preferredDay: '', time: '18:00', status: 'Por decidir' },
+      { id: 'outing-5', name: 'Salida 5', date: '2026-11-07', preferredDay: '', time: '18:00', status: 'Por decidir' },
+      { id: 'outing-6', name: 'Salida 6', date: '2026-11-21', preferredDay: '', time: '18:00', status: 'Por decidir' },
+      { id: 'outing-7', name: 'Salida 7', date: '2026-12-05', preferredDay: '', time: '18:00', status: 'Por decidir' }
+    ];
+    const statuses = ['Por decidir', 'Propuesta enviada', 'Confirmada'];
+    let state = { outings: [], responses: [] };
+    let isInitialized = false;
+
+    const $ = (selector) => document.querySelector(selector);
+    const escapeHtml = (value) => String(value).replace(/[&<>'"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' })[c]);
+
+    function setNotice(message) {
+      $('#notice').textContent = message;
+      window.clearTimeout(setNotice.timer);
+      setNotice.timer = window.setTimeout(() => { $('#notice').textContent = ''; }, 3600);
+    }
+
+    function formatDate(value) {
+      if (!value) return 'sin fecha';
+      const [year, month, day] = value.split('-').map(Number);
+      return new Intl.DateTimeFormat('es', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(year, month - 1, day));
+    }
+
+    function displayTime(time) {
+      const [h, m] = time.split(':').map(Number);
+      const suffix = h >= 12 ? 'p. m.' : 'a. m.';
+      const hour = h % 12 || 12;
+      return `${hour}:${String(m).padStart(2, '0')} ${suffix}`;
+    }
+
+    function updateStats() {
+      $('#stat-outings').textContent = state.outings.length;
+      $('#stat-people').textContent = (Array.isArray(state.responses) ? state.responses : Object.values(state.responses || {})).length;
+    }
+
+    function renderSchedule() {
+      const list = $('#schedule-list');
+      if (!state.outings || state.outings.length === 0) {
+        list.innerHTML = '<div class="empty">No hay salidas. Cargando...</div>';
+        return;
+      }
+      list.innerHTML = state.outings.map((outing, index) => `
+        <article class="outing" data-index="${index}">
+          <span class="number" aria-label="Salida número ${index + 1}">${index + 1}</span>
+          <input class="outing-name" aria-label="Nombre de salida ${index + 1}" data-field="name" value="${escapeHtml(outing.name)}">
+          <div class="date-field">
+            <label>Fecha tentativa<input type="date" data-field="date" value="${outing.date || ''}"></label>
+          </div>
+          <div class="day-field">
+            <label>Día preferido<select data-field="preferredDay">
+              <option value="">A elegir</option>
+              ${days.map(day => `<option value="${day.id}" ${outing.preferredDay === day.id ? 'selected' : ''}>${day.long}</option>`).join('')}
+            </select></label>
+          </div>
+          <div class="time-field">
+            <label>Hora preferida<input type="time" data-field="time" value="${outing.time || '18:00'}"></label>
+          </div>
+          <div class="status-field">
+            <label>Estado<select data-field="status">${statuses.map(status => `<option ${outing.status === status ? 'selected' : ''}>${status}</option>`).join('')}</select></label>
+          </div>
+          <div class="move-actions" aria-label="Mover salida ${index + 1}">
+            <button class="icon-button" type="button" data-move="up" ${index === 0 ? 'disabled' : ''} aria-label="Subir ${escapeHtml(outing.name)}">↑</button>
+            <button class="icon-button" type="button" data-move="down" ${index === state.outings.length - 1 ? 'disabled' : ''} aria-label="Bajar ${escapeHtml(outing.name)}">↓</button>
+          </div>
+        </article>`).join('');
+    }
+
+    function preferredDayName(id) {
+      return days.find(day => day.id === id)?.long || 'Día a elegir';
+    }
+
+    function getOuting(id) {
+      return state.outings.find(outing => outing.id === id);
+    }
+
+    function renderResponseOutingSelect() {
+      const select = $('#response-outing');
+      const current = select.value;
+      select.innerHTML = state.outings.map((outing, index) => `<option value="${outing.id}">${index + 1}. ${escapeHtml(outing.name)}</option>`).join('');
+      select.value = state.outings.some(outing => outing.id === current) ? current : state.outings[0]?.id || '';
+    }
+
+    function renderResponses() {
+      const list = $('#response-list');
+      const responses = Array.isArray(state.responses) ? state.responses : Object.values(state.responses || {});
+      if (!responses || responses.length === 0) {
+        list.innerHTML = '<div class="card empty">Aún no hay respuestas registradas. Anota el primer nombre aquí.</div>';
+        return;
+      }
+      list.innerHTML = responses.map(response => `
+        <article class="card response-card">
+          <div>
+            <div class="person-name">${escapeHtml(response.name)}</div>
+            <div class="response-detail"><b>${escapeHtml(getOuting(response.outingId)?.name || 'Salida eliminada')}</b><br>${formatDate(getOuting(response.outingId)?.date)} · ${preferredDayName(getOuting(response.outingId)?.preferredDay)} · ${displayTime(getOuting(response.outingId)?.time || '18:00')}</div>
+          </div>
+          <div class="response-actions">
+            <button class="icon-button" type="button" data-delete="${response.id}" aria-label="Eliminar respuesta de ${escapeHtml(response.name)}">×</button>
+          </div>
+        </article>`).join('');
+    }
+
+    function renderAll() { updateStats(); renderSchedule(); renderResponseOutingSelect(); renderResponses(); }
+
+    function exportCsv() {
+      const responses = Array.isArray(state.responses) ? state.responses : Object.values(state.responses || {});
+      const rows = [
+        ['Orden', 'Salida', 'Fecha tentativa', 'Día preferido', 'Hora preferida', 'Estado'],
+        ...state.outings.map((outing, index) => [index + 1, outing.name, outing.date, preferredDayName(outing.preferredDay), outing.time || '', outing.status]),
+        [],
+        ['Salida', 'Persona que respondió'],
+        ...responses.map(response => [getOuting(response.outingId)?.name || 'Salida eliminada', response.name])
       ];
-      const defaultOutings = [
-        { id: 'outing-1', name: 'Salida 1', date: '2026-09-12', preferredDay: '', time: '18:00', status: 'Por decidir' },
-        { id: 'outing-2', name: 'Salida 2', date: '2026-09-26', preferredDay: '', time: '18:00', status: 'Por decidir' },
-        { id: 'outing-3', name: 'Salida 3', date: '2026-10-10', preferredDay: '', time: '18:00', status: 'Por decidir' },
-        { id: 'outing-4', name: 'Salida 4', date: '2026-10-24', preferredDay: '', time: '18:00', status: 'Por decidir' },
-        { id: 'outing-5', name: 'Salida 5', date: '2026-11-07', preferredDay: '', time: '18:00', status: 'Por decidir' },
-        { id: 'outing-6', name: 'Salida 6', date: '2026-11-21', preferredDay: '', time: '18:00', status: 'Por decidir' },
-        { id: 'outing-7', name: 'Salida 7', date: '2026-12-05', preferredDay: '', time: '18:00', status: 'Por decidir' }
-      ];
-      const statuses = ['Por decidir', 'Propuesta enviada', 'Confirmada'];
-      let state = { outings: [], responses: [] };
-      let editId = null;
-      let isInitialized = false;
+      const csv = '\ufeff' + rows.map(row => row.map(value => `"${String(value ?? '').replaceAll('"', '""')}"`).join(',')).join('\r\n');
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
+      link.download = 'pilosalidas.csv';
+      link.click();
+      URL.revokeObjectURL(link.href);
+      setNotice('Se descargó el resumen en formato CSV.');
+    }
 
-      const $ = (selector) => document.querySelector(selector);
-      const escapeHtml = (value) => String(value).replace(/[&<>'"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' })[c]);
+    // Event listeners
+    $('.tabs').addEventListener('click', (event) => {
+      const tab = event.target.closest('[role="tab"]');
+      if (!tab) return;
+      document.querySelectorAll('[role="tab"]').forEach(item => item.setAttribute('aria-selected', item === tab ? 'true' : 'false'));
+      document.querySelectorAll('[role="tabpanel"]').forEach(panel => panel.classList.toggle('active', panel.id === tab.getAttribute('aria-controls')));
+    });
 
-      async function initFirebase() {
-        try {
-          const snapshot = await db.ref('/').once('value');
-          if (!snapshot.exists()) {
-            const initialData = {
-              outings: defaultOutings,
-              responses: []
-            };
-            await db.ref('/').set(initialData);
-            state = initialData;
-          } else {
-            const data = snapshot.val();
-            state.outings = data.outings || defaultOutings;
-            state.responses = data.responses || [];
-          }
-          isInitialized = true;
-          listenToChanges();
-          renderAll();
-        } catch (error) {
-          console.error('Error inicializando Firebase:', error);
-          setNotice('Error de conexión. Intenta recargar la página.');
-        }
+    $('#schedule-list').addEventListener('change', async (event) => {
+      const field = event.target.dataset.field;
+      if (!field) return;
+      const index = Number(event.target.closest('.outing').dataset.index);
+      state.outings[index][field] = event.target.value;
+      try {
+        await set(ref(db, '/outings'), state.outings);
+      } catch (error) {
+        console.error('Error guardando:', error);
+        setNotice('Error al guardar. Intenta nuevamente.');
       }
+    });
 
-      function listenToChanges() {
-        db.ref('/outings').on('value', (snapshot) => {
-          if (isInitialized && snapshot.exists()) {
-            state.outings = snapshot.val();
-            renderSchedule();
-            renderResponseOutingSelect();
-            renderResponses();
-            updateStats();
-          }
-        });
-
-        db.ref('/responses').on('value', (snapshot) => {
-          if (isInitialized) {
-            state.responses = snapshot.val() || [];
-            renderResponses();
-            updateStats();
-          }
-        });
+    $('#schedule-list').addEventListener('click', async (event) => {
+      const button = event.target.closest('[data-move]');
+      if (!button) return;
+      const index = Number(button.closest('.outing').dataset.index);
+      const target = button.dataset.move === 'up' ? index - 1 : index + 1;
+      if (target < 0 || target >= state.outings.length) return;
+      [state.outings[index], state.outings[target]] = [state.outings[target], state.outings[index]];
+      try {
+        await set(ref(db, '/outings'), state.outings);
+        setNotice('Se actualizó el orden de las salidas.');
+      } catch (error) {
+        console.error('Error guardando:', error);
       }
+    });
 
-      function setNotice(message) {
-        $('#notice').textContent = message;
-        window.clearTimeout(setNotice.timer);
-        setNotice.timer = window.setTimeout(() => { $('#notice').textContent = ''; }, 3600);
-      }
-
-      function formatDate(value) {
-        if (!value) return 'sin fecha';
-        const [year, month, day] = value.split('-').map(Number);
-        return new Intl.DateTimeFormat('es', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(year, month - 1, day));
-      }
-
-      function displayTime(time) {
-        const [h, m] = time.split(':').map(Number);
-        const suffix = h >= 12 ? 'p. m.' : 'a. m.';
-        const hour = h % 12 || 12;
-        return `${hour}:${String(m).padStart(2, '0')} ${suffix}`;
-      }
-
-      function updateStats() {
-        $('#stat-outings').textContent = state.outings.length;
-        $('#stat-people').textContent = Object.keys(state.responses).length || 0;
-      }
-
-      function renderSchedule() {
-        const list = $('#schedule-list');
-        if (!state.outings || state.outings.length === 0) {
-          list.innerHTML = '<div class="empty">No hay salidas. Cargando...</div>';
-          return;
-        }
-        list.innerHTML = state.outings.map((outing, index) => `
-          <article class="outing" data-index="${index}">
-            <span class="number" aria-label="Salida número ${index + 1}">${index + 1}</span>
-            <input class="outing-name" aria-label="Nombre de salida ${index + 1}" data-field="name" value="${escapeHtml(outing.name)}">
-            <div class="date-field">
-              <label>Fecha tentativa<input type="date" data-field="date" value="${outing.date || ''}"></label>
-            </div>
-            <div class="day-field">
-              <label>Día preferido<select data-field="preferredDay">
-                <option value="">A elegir</option>
-                ${days.map(day => `<option value="${day.id}" ${outing.preferredDay === day.id ? 'selected' : ''}>${day.long}</option>`).join('')}
-              </select></label>
-            </div>
-            <div class="time-field">
-              <label>Hora preferida<input type="time" data-field="time" value="${outing.time || '18:00'}"></label>
-            </div>
-            <div class="status-field">
-              <label>Estado<select data-field="status">${statuses.map(status => `<option ${outing.status === status ? 'selected' : ''}>${status}</option>`).join('')}</select></label>
-            </div>
-            <div class="move-actions" aria-label="Mover salida ${index + 1}">
-              <button class="icon-button" type="button" data-move="up" ${index === 0 ? 'disabled' : ''} aria-label="Subir ${escapeHtml(outing.name)}">↑</button>
-              <button class="icon-button" type="button" data-move="down" ${index === state.outings.length - 1 ? 'disabled' : ''} aria-label="Bajar ${escapeHtml(outing.name)}">↓</button>
-            </div>
-          </article>`).join('');
-      }
-
-      function preferredDayName(id) {
-        return days.find(day => day.id === id)?.long || 'Día a elegir';
-      }
-
-      function getOuting(id) {
-        return state.outings.find(outing => outing.id === id);
-      }
-
-      function renderResponseOutingSelect() {
-        const select = $('#response-outing');
-        const current = select.value;
-        select.innerHTML = state.outings.map((outing, index) => `<option value="${outing.id}">${index + 1}. ${escapeHtml(outing.name)}</option>`).join('');
-        select.value = state.outings.some(outing => outing.id === current) ? current : state.outings[0]?.id || '';
-      }
-
-      function renderResponses() {
-        const list = $('#response-list');
-        if (!state.responses || Object.keys(state.responses).length === 0) {
-          list.innerHTML = '<div class="card empty">Aún no hay respuestas registradas. Anota el primer nombre aquí.</div>';
-          return;
-        }
-        const responses = Array.isArray(state.responses) ? state.responses : Object.values(state.responses);
-        list.innerHTML = responses.map(response => `
-          <article class="card response-card">
-            <div>
-              <div class="person-name">${escapeHtml(response.name)}</div>
-              <div class="response-detail"><b>${escapeHtml(getOuting(response.outingId)?.name || 'Salida eliminada')}</b><br>${formatDate(getOuting(response.outingId)?.date)} · ${preferredDayName(getOuting(response.outingId)?.preferredDay)} · ${displayTime(getOuting(response.outingId)?.time || '18:00')}</div>
-            </div>
-            <div class="response-actions">
-              <button class="icon-button" type="button" data-delete="${response.id}" aria-label="Eliminar respuesta de ${escapeHtml(response.name)}">×</button>
-            </div>
-          </article>`).join('');
-      }
-
-      function renderAll() { updateStats(); renderSchedule(); renderResponseOutingSelect(); renderResponses(); }
-
-      function exportCsv() {
-        const responses = Array.isArray(state.responses) ? state.responses : Object.values(state.responses);
-        const rows = [
-          ['Orden', 'Salida', 'Fecha tentativa', 'Día preferido', 'Hora preferida', 'Estado'],
-          ...state.outings.map((outing, index) => [index + 1, outing.name, outing.date, preferredDayName(outing.preferredDay), outing.time || '', outing.status]),
-          [],
-          ['Salida', 'Persona que respondió'],
-          ...responses.map(response => [getOuting(response.outingId)?.name || 'Salida eliminada', response.name])
-        ];
-        const csv = '\ufeff' + rows.map(row => row.map(value => `"${String(value ?? '').replaceAll('"', '""')}"`).join(',')).join('\r\n');
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
-        link.download = 'pilosalidas.csv';
-        link.click();
-        URL.revokeObjectURL(link.href);
-        setNotice('Se descargó el resumen en formato CSV.');
-      }
-
-      $('.tabs').addEventListener('click', (event) => {
-        const tab = event.target.closest('[role="tab"]');
-        if (!tab) return;
-        document.querySelectorAll('[role="tab"]').forEach(item => item.setAttribute('aria-selected', item === tab ? 'true' : 'false'));
-        document.querySelectorAll('[role="tabpanel"]').forEach(panel => panel.classList.toggle('active', panel.id === tab.getAttribute('aria-controls')));
-      });
-
-      $('#schedule-list').addEventListener('change', async (event) => {
-        const field = event.target.dataset.field;
-        if (!field) return;
-        const index = Number(event.target.closest('.outing').dataset.index);
-        state.outings[index][field] = event.target.value;
-        try {
-          await db.ref('/outings').set(state.outings);
-        } catch (error) {
-          console.error('Error guardando:', error);
-          setNotice('Error al guardar. Intenta nuevamente.');
-        }
-      });
-
-      $('#schedule-list').addEventListener('click', async (event) => {
-        const button = event.target.closest('[data-move]');
-        if (!button) return;
-        const index = Number(button.closest('.outing').dataset.index);
-        const target = button.dataset.move === 'up' ? index - 1 : index + 1;
-        if (target < 0 || target >= state.outings.length) return;
-        [state.outings[index], state.outings[target]] = [state.outings[target], state.outings[index]];
-        try {
-          await db.ref('/outings').set(state.outings);
-          setNotice('Se actualizó el orden de las salidas.');
-        } catch (error) {
-          console.error('Error guardando:', error);
-        }
-      });
-
-      $('#response-form').addEventListener('submit', async (event) => {
-        event.preventDefault();
-        const form = new FormData(event.currentTarget);
-        const name = form.get('name').trim();
-        const outingId = form.get('outingId');
-        if (!outingId) { setNotice('Elige la salida que ya respondió la persona.'); return; }
-        
-        const newResponse = { 
-          id: `${Date.now()}-${Math.random().toString(16).slice(2)}`, 
-          name, 
-          outingId 
-        };
-
-        try {
-          const responses = Array.isArray(state.responses) ? state.responses : Object.values(state.responses);
-          responses.push(newResponse);
-          await db.ref('/responses').set(responses);
-          $('#response-form').reset();
-          renderResponseOutingSelect();
-          setNotice('La respuesta fue guardada.');
-        } catch (error) {
-          console.error('Error guardando respuesta:', error);
-          setNotice('Error al guardar. Intenta nuevamente.');
-        }
-      });
-
-      $('#response-list').addEventListener('click', async (event) => {
-        const remove = event.target.closest('[data-delete]');
-        if (remove) {
-          const responseId = remove.dataset.delete;
-          const responses = Array.isArray(state.responses) ? state.responses : Object.values(state.responses);
-          const response = responses.find(item => item.id === responseId);
-          if (!response || !window.confirm(`¿Eliminar la respuesta de ${response.name}?`)) return;
-          
-          try {
-            const filtered = responses.filter(item => item.id !== responseId);
-            await db.ref('/responses').set(filtered);
-            setNotice('Se eliminó la respuesta.');
-          } catch (error) {
-            console.error('Error eliminando:', error);
-            setNotice('Error al eliminar. Intenta nuevamente.');
-          }
-        }
-      });
-
-      $('#export-csv').addEventListener('click', exportCsv);
+    $('#response-form').addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const form = new FormData(event.currentTarget);
+      const name = form.get('name').trim();
+      const outingId = form.get('outingId');
+      if (!outingId) { setNotice('Elige la salida que ya respondió la persona.'); return; }
       
-      $('#reset-data').addEventListener('click', async () => {
-        if (!window.confirm('¿Restablecer las 7 salidas de ejemplo y borrar todas las respuestas?')) return;
-        try {
-          const initialData = {
-            outings: defaultOutings,
-            responses: []
-          };
-          await db.ref('/').set(initialData);
-          state = initialData;
-          renderAll();
-          setNotice('Se restableció el organizador.');
-        } catch (error) {
-          console.error('Error restableciendo:', error);
-          setNotice('Error al restablecer. Intenta nuevamente.');
-        }
-      });
+      const newResponse = { 
+        id: `${Date.now()}-${Math.random().toString(16).slice(2)}`, 
+        name, 
+        outingId 
+      };
 
-      initFirebase();
-    })();
+      try {
+        const responses = Array.isArray(state.responses) ? state.responses : Object.values(state.responses || {});
+        responses.push(newResponse);
+        await set(ref(db, '/responses'), responses);
+        $('#response-form').reset();
+        renderResponseOutingSelect();
+        setNotice('La respuesta fue guardada.');
+      } catch (error) {
+        console.error('Error guardando respuesta:', error);
+        setNotice('Error al guardar. Intenta nuevamente.');
+      }
+    });
+
+    $('#response-list').addEventListener('click', async (event) => {
+      const remove = event.target.closest('[data-delete]');
+      if (remove) {
+        const responseId = remove.dataset.delete;
+        const responses = Array.isArray(state.responses) ? state.responses : Object.values(state.responses || {});
+        const response = responses.find(item => item.id === responseId);
+        if (!response || !window.confirm(`¿Eliminar la respuesta de ${response.name}?`)) return;
+        
+        try {
+          const filtered = responses.filter(item => item.id !== responseId);
+          await set(ref(db, '/responses'), filtered);
+          setNotice('Se eliminó la respuesta.');
+        } catch (error) {
+          console.error('Error eliminando:', error);
+          setNotice('Error al eliminar. Intenta nuevamente.');
+        }
+      }
+    });
+
+    $('#export-csv').addEventListener('click', exportCsv);
+    
+    $('#reset-data').addEventListener('click', async () => {
+      if (!window.confirm('¿Restablecer las 7 salidas de ejemplo y borrar todas las respuestas?')) return;
+      try {
+        const initialData = {
+          outings: defaultOutings,
+          responses: []
+        };
+        await set(ref(db, '/'), initialData);
+        state = initialData;
+        renderAll();
+        setNotice('Se restableció el organizador.');
+      } catch (error) {
+        console.error('Error restableciendo:', error);
+        setNotice('Error al restablecer. Intenta nuevamente.');
+      }
+    });
+
+    // Inicializar Firebase listeners
+    onValue(ref(db, '/outings'), (snapshot) => {
+      if (snapshot.exists()) {
+        state.outings = snapshot.val();
+        renderSchedule();
+        renderResponseOutingSelect();
+        renderResponses();
+        updateStats();
+        if (!isInitialized) {
+          isInitialized = true;
+        }
+      }
+    });
+
+    onValue(ref(db, '/responses'), (snapshot) => {
+      if (snapshot.exists()) {
+        state.responses = snapshot.val();
+      } else {
+        state.responses = [];
+      }
+      if (isInitialized) {
+        renderResponses();
+        updateStats();
+      }
+    });
   </script>
 </body>
 </html>
